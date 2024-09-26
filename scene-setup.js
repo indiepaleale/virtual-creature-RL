@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
+
 export const scene = new THREE.Scene();
 export const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 export const renderer = new THREE.WebGLRenderer();
@@ -26,6 +27,7 @@ const textureEquirec = textureLoader.load('./2294472375_24a3b8ef46_o.jpg');
 textureEquirec.mapping = THREE.EquirectangularReflectionMapping;
 textureEquirec.colorSpace = THREE.SRGBColorSpace;
 scene.background = textureEquirec;
+
 
 // Add lights
 const hemiLight = new THREE.HemisphereLight(0xffffff, 0x8d8d8d, 1);
@@ -78,6 +80,3 @@ window.addEventListener('dblclick', () => {
         }
     }
 });
-
-
-console.log('scene-setup loaded');

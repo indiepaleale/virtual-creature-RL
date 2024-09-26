@@ -1,71 +1,91 @@
 import * as THREE from 'three';
-import { scene } from './scene-setup';
 import { mapLinear } from 'three/src/math/MathUtils.js';
 import { Noise } from 'noisejs';
+import RobotCam from './second-camera';
+import { hydra, hydraSetup } from './hydra';
 import control from "./control";
 
-// draw spines
-export const segmentsLow = [];
-export const segmentsHigh = [];
+// import './RLearning';
 
-const noise = new Noise(Math.random());
+export default class Tentacle {
+    constructor({ scene, sectionCount = 2, segmentCount = 9, angleLimit = Math.PI / 12 }) {
+        this.sectionCount = sectionCount;
+        this.segmentCount = segmentCount;
+        this.scene = scene;
+        this.angleLimit = angleLimit;
 
-const vertabraeCount = 9;
-const angleLimit = Math.PI / 12;
+        this.segmentsLow = [];
+        this.segmentsHigh = [];
+        this.robotCam = new RobotCam(scene, window.innerWidth / 3, window.innerWidth / 4);
 
-// Three.js geometry and material
-const geometry = new THREE.CylinderGeometry(2, 2, 0.5, 36);
-const materialLow = new THREE.MeshPhongMaterial({ color: 0x9090ee });
-const materialHigh = new THREE.MeshPhongMaterial({ color: 0x90ee90 });
-
-const rootSegment = new THREE.Mesh(geometry, materialLow);
-segmentsLow.push(rootSegment);
-
-while(segmentsLow.length < vertabraeCount) {
-    let vertabrae = new THREE.Mesh(geometry, materialLow);
-    vertabrae.position.y += 2;
-    if (segmentsLow.length > 0) {
-        segmentsLow[segmentsLow.length - 1].add(vertabrae);
-    }
-    else {
-        rootSegment.add(vertabrae);
-    }
-    segmentsLow.push(vertabrae);
-}
-
-const rootSegmentHigh = segmentsLow[segmentsLow.length - 1];
-
-while(segmentsHigh.length < vertabraeCount) {
-    let vertabrae = new THREE.Mesh(geometry, materialHigh);
-    vertabrae.position.y += 2;
-    if (segmentsHigh.length > 0) {
-        segmentsHigh[segmentsHigh.length - 1].add(vertabrae);
-    }
-    else {
-        rootSegmentHigh.add(vertabrae);
-    }
-    segmentsHigh.push(vertabrae);
-}
-
-scene.add(rootSegment);
-
-const clock = new THREE.Clock();
-
-export function updateTentacle() {
-    const noiseTime = clock.getElapsedTime() * 0.2;
-    
-    const noiseLx = noise.simplex2(noiseTime, 0);
-    const noiseLz = noise.simplex2(noiseTime, 10);
-    const noiseHx = noise.simplex2(0, noiseTime);
-    const noiseHz = noise.simplex2(10, noiseTime);
-
-    for (let segment of segmentsLow) {
-        segment.rotation.x = mapLinear(noiseLx, -1, 1, -angleLimit, angleLimit);
-        segment.rotation.z = mapLinear(noiseLz, -1, 1, -angleLimit, angleLimit);
+        this.noise = new Noise(Math.random());
+        this.clock = new THREE.Clock();
     }
 
-    for (let segment of segmentsHigh) {
-        segment.rotation.x = mapLinear(noiseHx, -1, 1, -angleLimit, angleLimit);
-        segment.rotation.z = mapLinear(noiseHz, -1, 1, -angleLimit, angleLimit);
+    init = () => {
+        const geometry = new THREE.CylinderGeometry(2, 2, 0.5, 36);
+        const materialLow = new THREE.MeshPhongMaterial({ color: 0x9090ee });
+        const materialHigh = new THREE.MeshPhongMaterial({ color: 0x90ee90 });
+
+        const rootSegment = new THREE.Mesh(geometry, materialLow);
+        this.segmentsLow.push(rootSegment);
+
+        while (this.segmentsLow.length < this.segmentCount) {
+            let vertabrae = new THREE.Mesh(geometry, materialLow);
+            vertabrae.position.y += 2;
+            if (this.segmentsLow.length > 0) {
+                this.segmentsLow[this.segmentsLow.length - 1].add(vertabrae);
+            }
+            else {
+                rootSegment.add(vertabrae);
+            }
+            this.segmentsLow.push(vertabrae);
+        }
+
+        const rootSegmentHigh = this.segmentsLow[this.segmentsLow.length - 1];
+
+        while (this.segmentsHigh.length < this.segmentCount) {
+            let vertabrae = new THREE.Mesh(geometry, materialHigh);
+            vertabrae.position.y += 2;
+            if (this.segmentsHigh.length > 0) {
+                this.segmentsHigh[this.segmentsHigh.length - 1].add(vertabrae);
+            }
+            else {
+                rootSegmentHigh.add(vertabrae);
+            }
+            this.segmentsHigh.push(vertabrae);
+        }
+
+        this.robotCam.root = this.segmentsHigh[this.segmentsHigh.length - 1];
+        this.robotCam.root.add(this.robotCam.camera);
+
+        this.scene.add(rootSegment);
+
+        hydraSetup(hydra, this.robotCam.renderer.domElement);
+
     }
+
+    update = () => {
+
+        // Movement from noise
+        const noiseTime = this.clock.getElapsedTime() * 0.2;
+
+        const noiseLx = this.noise.simplex2(noiseTime, 0);
+        const noiseLz = this.noise.simplex2(noiseTime, 10);
+        const noiseHx = this.noise.simplex2(0, noiseTime);
+        const noiseHz = this.noise.simplex2(10, noiseTime);
+
+        for (let segment of this.segmentsLow) {
+            segment.rotation.x = mapLinear(noiseLx, -1, 1, -this.angleLimit, this.angleLimit);
+            segment.rotation.z = mapLinear(noiseLz, -1, 1, -this.angleLimit, this.angleLimit);
+        }
+
+        for (let segment of this.segmentsHigh) {
+            segment.rotation.x = mapLinear(noiseHx, -1, 1, -this.angleLimit, this.angleLimit);
+            segment.rotation.z = mapLinear(noiseHz, -1, 1, -this.angleLimit, this.angleLimit);
+        }
+
+        this.robotCam.render();
+    }
+
 }

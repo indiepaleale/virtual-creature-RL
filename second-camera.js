@@ -1,20 +1,85 @@
 import * as THREE from 'three';
-import { scene, camera, renderer } from './scene-setup';
-import { segmentsLow, segmentsHigh } from './tentacle';
 
-// Create a secondary camera
-const secondaryCamera = new THREE.PerspectiveCamera(75, 4 / 3, 0.1, 1000);
-secondaryCamera.lookAt(secondaryCamera.position.x, secondaryCamera.position.y + 1, secondaryCamera.position.z);
-segmentsHigh[segmentsHigh.length - 1].add(secondaryCamera);
+export default class RobotCam {
+    constructor(scene, width, height) {
+        this.scene = scene;
+        this.camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
+        this.renderer = new THREE.WebGLRenderer({ antialias: true });
+        this.renderTarget = new THREE.WebGLRenderTarget(width, height);
+        this.root = null;
+        this.pixelBuffer = null;
 
-// Create a secondary renderer
-const secondaryRenderer = new THREE.WebGLRenderer({ antialias: true });
-secondaryRenderer.setSize(window.innerHeight / 3, window.innerHeight / 4); // Smaller size for the pop-up window
-secondaryRenderer.domElement.style.position = 'absolute';
-secondaryRenderer.domElement.style.bottom = '10px';
-secondaryRenderer.domElement.style.right = '10px';
-document.body.appendChild(secondaryRenderer.domElement);
+        this.init(width, height);
+    }
 
-export { secondaryCamera, secondaryRenderer };
+    init = (width, height) => {
+        this.camera.lookAt(this.camera.position.x, this.camera.position.y + 1, this.camera.position.z);
+        this.renderer.setSize(width, height);
+        this.renderer.domElement.style.position = 'absolute';
+        this.renderer.domElement.style.bottom = '10px';
+        this.renderer.domElement.style.right = '10px';
+        document.body.appendChild(this.renderer.domElement);
 
-export const robotCanvas = secondaryRenderer.domElement;
+    }
+
+    render = () => {
+        this.renderer.setRenderTarget(this.renderTarget);
+        this.renderer.render(this.scene, this.camera);
+        this.renderer.setRenderTarget(null);
+        this.renderer.render(this.scene, this.camera);
+        
+        this.updatePixelBuffer(8, 8);
+        
+    }
+
+
+    updatePixelBuffer = (width, height) => {
+        const nativeWidth = this.renderTarget.width;
+        const nativeHeight = this.renderTarget.height;
+        const pixelBuffer = new Uint8Array(nativeWidth * nativeHeight * 4);
+        this.renderer.readRenderTargetPixels(this.renderTarget, 0, 0, width, height, pixelBuffer);
+
+        const downsampledBuffer = new Uint8Array(width * height);
+        const blockWidth = width / nativeWidth;
+        const blockHeight = height / nativeHeight;
+
+        for (let y = 0; y < nativeHeight; y++) {
+            for (let x = 0; x < nativeWidth; x++) {
+                let r = 0, g = 0, b = 0;
+                let brightness = 0;
+                let count = 0;
+
+                for (let by = 0; by < blockHeight; by++) {
+                    for (let bx = 0; bx < blockWidth; bx++) {
+                        const px = Math.floor(x * blockWidth + bx);
+                        const py = Math.floor(y * blockHeight + by);
+                        const index = (py * width + px) * 4;
+                        r += pixelBuffer[index];
+                        g += pixelBuffer[index + 1];
+                        b += pixelBuffer[index + 2];
+                        count++;
+                    }
+                }
+                brightness = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+                const index = (y * width + x);
+                downsampledBuffer[index] = brightness / count;
+            }
+        }
+        this.pixelBuffer = downsampledBuffer;
+    }
+
+    getPixelBuffer = () => {
+        return this.pixelBuffer;
+    }
+
+    getBrightness = () => {
+        let averageBrightness = 0;
+        for (let i = 0; i < this.pixelBuffer.length; i++) {
+            averageBrightness += this.pixelBuffer[i];
+        }
+        averageBrightness /= this.pixelBuffer.length;
+        const gamma = 2.2;
+        return Math.pow(averageBrightness / 255, 1 / gamma);
+    }
+
+}
