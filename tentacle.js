@@ -4,6 +4,7 @@ import { Noise } from 'noisejs';
 import RobotCam from './second-camera';
 import { hydra, hydraSetup } from './hydra';
 import control from "./control";
+import RLearning from './RLearning';
 
 // import './RLearning';
 
@@ -85,7 +86,7 @@ export default class Tentacle {
             segment.rotation.z = mapLinear(noiseHz, -1, 1, -this.angleLimit, this.angleLimit);
         }
 
-        this.robotCam.render();
+        this.robotCam.render(); 
     }
 
 }
